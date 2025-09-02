@@ -13,13 +13,13 @@ export default function Cards() {
 
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {schools.map((school) => (
+            {schools?.map((school) => (
                 <div
                     key={school.id}
                     className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition duration-300"
                 >
                     <img
-                        src={`/uploads/${school.image}`}
+                        src={school.image}
                         alt={school.name}
                         className="w-full h-48 object-cover"
                     />
