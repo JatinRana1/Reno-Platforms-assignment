@@ -1,12 +1,22 @@
 import NextAuth from "next-auth";
 import EmailProvider from "next-auth/providers/email";
+import { PrismaAdapter } from "@next-auth/prisma-adapter"
+import prisma from '@/app/lib/prisma'
 
 export const authOptions = {
+  adapter: PrismaAdapter(prisma),
   providers: [
     EmailProvider({
-      server: process.env.EMAIL_SERVER, // e.g. SMTP config
-      from: process.env.EMAIL_FROM,     // e.g. "no-reply@yourapp.com"
-      maxAge: 10 * 60, // ⏳ OTP/magic link expires in 10 minutes
+      server: {
+        host: process.env.EMAIL_SERVER_HOST,  // e.g. "smtp-relay.brevo.com"
+        port: Number(process.env.EMAIL_SERVER_PORT), // usually 587
+        auth: {
+          user: process.env.EMAIL_SERVER_USER,  // your Brevo login (email or API key)
+          pass: process.env.EMAIL_SERVER_PASSWORD, // your Brevo SMTP key
+        },
+      },
+      from: process.env.EMAIL_FROM, // e.g. "no-reply@yourdomain.com"
+      maxAge: 10 * 60,
     }),
   ],
   pages: {
