@@ -20,6 +20,14 @@ const ShowSchools = () => {
               <Plus className="w-5 h-5" />
               <span>Add Schools</span>
             </Link>
+
+            <Link
+              href='/login'
+              className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 shadow-md hover:shadow-lg"
+            >
+              <Plus className="w-5 h-5" />
+              <span>Login</span>
+            </Link>
           </div>
 
           <Cards />
