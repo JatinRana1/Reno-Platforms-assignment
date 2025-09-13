@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import prisma from '@/app/lib/prisma'
-import { writeFile } from "fs/promises";
-import path from "path";
+import prisma from "@/app/lib/prisma";
 import { v2 as cloudinary } from "cloudinary";
+import { requireAuth } from "@/app/lib/requireAuth";
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -10,81 +9,31 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// Reusable image upload function
+async function uploadImage(file) {
+  if (!file || !file.name) return null;
 
-// export async function POST(req) {
-//   try {
-//     const formData = await req.formData();
+  const bytes = await file.arrayBuffer();
+  const buffer = Buffer.from(bytes);
 
-//     const name = formData.get("name");
-//     const address = formData.get("address");
-//     const city = formData.get("city");
-//     const state = formData.get("state");
-//     const contact = formData.get("contact");
-//     const email_id = formData.get("email_id");
-//     const file = formData.get("image");
+  const uploaded = await new Promise((resolve, reject) => {
+    cloudinary.uploader
+      .upload_stream({ folder: "schools" }, (err, result) => {
+        if (err) reject(err);
+        else resolve(result);
+      })
+      .end(buffer);
+  });
 
-//     // 🔎 1. Check if email already exists
-//     const existingSchool = await prisma.school.findUnique({
-//       where: { email_id },
-//     });
+  return uploaded.secure_url;
+}
 
-//     if (existingSchool) {
-//       return NextResponse.json(
-//         { error: "A school with this email_id already exists" },
-//         { status: 400 }
-//       );
-//     }
-
-//     // 🖼️ 2. Upload image to Cloudinary
-//     let imageUrl = null;
-//     if (file && file.name) {
-//       const bytes = await file.arrayBuffer();
-//       const buffer = Buffer.from(bytes);
-
-//       const uploaded = await new Promise((resolve, reject) => {
-//         cloudinary.uploader
-//           .upload_stream({ folder: "schools" }, (error, result) => {
-//             if (error) reject(error);
-//             else resolve(result);
-//           })
-//           .end(buffer);
-//       });
-
-//       imageUrl = uploaded.secure_url; // ✅ permanent image URL
-//     }
-
-//     // 🗄️ 3. Save to DB
-//     const school = await prisma.school.create({
-//       data: {
-//         name,
-//         address,
-//         city,
-//         state,
-//         contact,
-//         email_id,
-//         image: imageUrl,
-//       },
-//     });
-
-//     return NextResponse.json(school, { status: 201 });
-//   } catch (error) {
-//     console.error("Error:", error);
-
-//     return NextResponse.json(
-//       { error: "Failed to create school" },
-//       { status: 500 }
-//     );
-//   }
-// }
-
-
+// ------------------ ADD SCHOOL ------------------
 export async function POST(req) {
+  await requireAuth();
+
   try {
-    console.log("📥 Incoming request...");
-
     const formData = await req.formData();
-    console.log("✅ FormData received");
-
     const name = formData.get("name");
     const address = formData.get("address");
     const city = formData.get("city");
@@ -93,88 +42,76 @@ export async function POST(req) {
     const email_id = formData.get("email_id");
     const file = formData.get("image");
 
-    console.log("➡️ Parsed fields:", { name, email_id, hasFile: !!file });
-
-    // 🔎 1. Check if email already exists
-    const existingSchool = await prisma.school.findUnique({
-      where: { email_id },
-    });
-
+    // Check duplicate email
+    const existingSchool = await prisma.school.findUnique({ where: { email_id } });
     if (existingSchool) {
-      console.warn("⚠️ Email already exists:", email_id);
-      return NextResponse.json(
-        { error: "A school with this email_id already exists" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "A school with this email_id already exists" }, { status: 400 });
     }
 
-    // 🖼️ 2. Upload image to Cloudinary
-    let imageUrl = null;
-    if (file && file.name) {
-      try {
-        console.log("📤 Uploading image to Cloudinary...");
-        const bytes = await file.arrayBuffer();
-        const buffer = Buffer.from(bytes);
+    const imageUrl = await uploadImage(file);
 
-        const uploaded = await new Promise((resolve, reject) => {
-          cloudinary.uploader
-            .upload_stream({ folder: "schools" }, (error, result) => {
-              if (error) {
-                console.error("❌ Cloudinary upload failed:", error);
-                reject(error);
-              } else {
-                console.log("✅ Cloudinary upload success:", result.secure_url);
-                resolve(result);
-              }
-            })
-            .end(buffer);
-        });
-
-        imageUrl = uploaded.secure_url;
-      } catch (uploadError) {
-        console.error("🚨 Upload error:", uploadError);
-        return NextResponse.json(
-          { error: "Image upload failed", details: uploadError.message },
-          { status: 500 }
-        );
-      }
-    } else {
-      console.log("ℹ️ No image uploaded, skipping Cloudinary.");
-    }
-
-    // 🗄️ 3. Save to DB
-    console.log("💾 Saving school to DB...");
     const school = await prisma.school.create({
-      data: {
-        name,
-        address,
-        city,
-        state,
-        contact,
-        email_id,
-        image: imageUrl,
-      },
+      data: { name, address, city, state, contact, email_id, image: imageUrl },
     });
-
-    console.log("✅ School created:", school);
 
     return NextResponse.json(school, { status: 201 });
   } catch (error) {
-    console.error("🚨 Unexpected Error:", error);
-
-    return NextResponse.json(
-      { error: "Failed to create school", details: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to create school", details: error.message }, { status: 500 });
   }
 }
 
-
-export async function GET() {
+// ------------------ GET SCHOOL ------------------
+export async function GET(req) {
   try {
+    const url = new URL(req.url);
+    const id = url.searchParams.get("id");
+
+    if (id) {
+      // Fetch single school by ID
+      const school = await prisma.school.findUnique({ where: { id: Number(id) } });
+      if (!school) {
+        return NextResponse.json({ error: "School not found" }, { status: 404 });
+      }
+      return NextResponse.json(school);
+    }
+
+    // Fetch all schools if no ID
     const schools = await prisma.school.findMany();
     return NextResponse.json(schools);
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch schools" }, { status: 500 });
+  }
+}
+
+// ------------------ EDIT SCHOOL ------------------
+export async function PUT(req) {
+  await requireAuth();
+
+  try {
+    const formData = await req.formData();
+    const id = formData.get("id");
+    const name = formData.get("name");
+    const address = formData.get("address");
+    const city = formData.get("city");
+    const state = formData.get("state");
+    const contact = formData.get("contact");
+    const email_id = formData.get("email_id");
+    const file = formData.get("image");
+
+    const existingSchool = await prisma.school.findUnique({ where: { id: Number(id) } });
+    if (!existingSchool) {
+      return NextResponse.json({ error: "School not found" }, { status: 404 });
+    }
+
+    const imageUrl = file?.name ? await uploadImage(file) : existingSchool.image;
+
+    const updatedSchool = await prisma.school.update({
+      where: { id: Number(id) },
+      data: { name, address, city, state, contact, email_id, image: imageUrl },
+    });
+
+    return NextResponse.json(updatedSchool, { status: 200 });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to update school", details: error.message }, { status: 500 });
   }
 }

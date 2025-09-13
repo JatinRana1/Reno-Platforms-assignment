@@ -1,9 +1,21 @@
+"use client";
 import React from 'react'
 import Link from 'next/link'
 import Cards from './components/home/Cards'
-import { Plus } from 'lucide-react';
+import { Plus, LogOut } from 'lucide-react';
+import { useSession, signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 const ShowSchools = () => {
+  const { data: session, status } = useSession();
+
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await signOut({ redirect: false });
+    router.push('/');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
@@ -12,22 +24,36 @@ const ShowSchools = () => {
             Schools
           </h1>
 
-          <div className="mb-8">
-            <Link
-              href='/add-school'
-              className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 shadow-md hover:shadow-lg"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Add Schools</span>
-            </Link>
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              {session ? (
+                <Link
+                  href='/add-school'
+                  className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 shadow-md hover:shadow-lg"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>Add Schools</span>
+                </Link>
+              ) : (
+                <Link
+                  href='/login'
+                  className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 shadow-md hover:shadow-lg"
+                >
+                  <Plus className="w-5 h-5" />
+                  <span>Login</span>
+                </Link>
+              )}
+            </div>
 
-            <Link
-              href='/login'
-              className="inline-flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 shadow-md hover:shadow-lg"
-            >
-              <Plus className="w-5 h-5" />
-              <span>Login</span>
-            </Link>
+            {session && (
+              <button
+                onClick={handleLogout}
+                className="inline-flex items-center space-x-2 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-colors duration-200 shadow-md hover:shadow-lg"
+              >
+                <LogOut className="w-5 h-5" />
+                <span>Logout</span>
+              </button>
+            )}
           </div>
 
           <Cards />
